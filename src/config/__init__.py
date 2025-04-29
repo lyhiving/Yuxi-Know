@@ -42,7 +42,6 @@ class Config(SimpleConfig):
         self._update_models_from_file()
 
         ### >>> 默认配置
-        self.add_item("stream", default=True, des="是否开启流式输出")
         # 功能选项
         self.add_item("enable_reranker", default=False, des="是否开启重排序")
         self.add_item("enable_knowledge_base", default=False, des="是否开启知识库")
@@ -99,11 +98,12 @@ class Config(SimpleConfig):
         except FileNotFoundError:
             _models_private = {}
 
-        _models = {**_models, **_models_private}
+        # 修改为按照子元素合并
+        # _models = {**_models, **_models_private}
 
-        self.model_names = _models["MODEL_NAMES"]
-        self.embed_model_names = _models["EMBED_MODEL_INFO"]
-        self.reranker_names = _models["RERANKER_LIST"]
+        self.model_names = {**_models["MODEL_NAMES"], **_models_private.get("MODEL_NAMES", {})}
+        self.embed_model_names = {**_models["EMBED_MODEL_INFO"], **_models_private.get("EMBED_MODEL_INFO", {})}
+        self.reranker_names = {**_models["RERANKER_LIST"], **_models_private.get("RERANKER_LIST", {})}
 
     def _save_models_to_file(self):
         _models = {
@@ -120,7 +120,13 @@ class Config(SimpleConfig):
         """
         model_provider_info = self.model_names.get(self.model_provider, {})
         self.model_dir = os.environ.get("MODEL_DIR", "")
-        logger.info(f"MODEL_DIR: {self.model_dir}; 如果是在 docker 中运行，会自动挂载 MODEL_DIR 到 /models 目录，请检查 docker compose 文件")
+
+        if self.model_dir:
+            if os.path.exists(self.model_dir):
+                logger.info(f"MODEL_DIR （{self.model_dir}） 下面的文件夹: {os.listdir(self.model_dir)}")
+            else:
+                logger.warning(f"提醒：MODEL_DIR （{self.model_dir}） 不存在，如果未配置，请忽略，如果配置了，请检查是否配置正确，比如 docker-compose 文件中的映射")
+
 
         # 检查模型提供商是否存在
         if self.model_provider != "custom":

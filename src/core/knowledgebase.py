@@ -11,7 +11,6 @@ from src.utils import logger, hashstr
 from src.core.indexing import chunk, read_text
 from src.core.kb_db_manager import kb_db_manager
 
-
 class KnowledgeBase:
 
     def __init__(self) -> None:
@@ -110,7 +109,7 @@ class KnowledgeBase:
             try:
                 milvus_info = self.get_collection_info(db["db_id"])
                 db_copy["metadata"] = milvus_info
-                logger.debug(f"获取知识库 {db['name']} (ID: {db['db_id']}) 的Milvus信息成功: {milvus_info}")
+                # logger.debug(f"获取知识库 {db['name']} (ID: {db['db_id']}) 的Milvus信息成功: {milvus_info}")
             except Exception as e:
                 logger.warning(f"获取知识库 {db['name']} (ID: {db['db_id']}) 的Milvus信息失败: {e}")
                 # 添加一个默认的Milvus状态
@@ -250,7 +249,7 @@ class KnowledgeBase:
     def add_files(self, db_id, files, params=None):
         db = self.get_kb_by_id(db_id)
 
-        if db["embed_model"] != self.embed_model.embed_model_fullname:
+        if not self.check_embed_model(db_id):
             logger.error(f"Embed model not match, {db['embed_model']} != {self.embed_model.embed_model_fullname}")
             return {"message": f"Embed model not match, cur: {self.embed_model.embed_model_fullname}, req: {db['embed_model']}", "status": "failed"}
 
@@ -312,13 +311,13 @@ class KnowledgeBase:
     ###################################
 
     def query(self, query, db_id, **kwargs):
-        db = self.get_kb_by_id(db_id)
 
         distance_threshold = kwargs.get("distance_threshold", self.default_distance_threshold)
         rerank_threshold = kwargs.get("rerank_threshold", self.default_rerank_threshold)
         max_query_count = kwargs.get("max_query_count", self.default_max_query_count)
 
         all_db_result = self.search(query, db_id, limit=max_query_count)
+        all_db_result = [dict(r) for r in all_db_result]
 
         # 获取文件信息并添加到结果中
         for res in all_db_result:
@@ -361,11 +360,19 @@ class KnowledgeBase:
     def get_retrievers(self):
         retrievers = {}
         for db in self.db_manager.get_all_databases():
-            retrievers[db["db_id"]] = {
-                "name": db["name"],
-                "description": db["description"],
-                "retriever": self.get_retriever_by_db_id(db["db_id"]),
-            }
+            if self.check_embed_model(db["db_id"]):
+                retrievers[db["db_id"]] = {
+                    "name": db["name"],
+                    "description": db["description"],
+                    "retriever": self.get_retriever_by_db_id(db["db_id"]),
+                    "embed_model": db["embed_model"],
+                }
+            else:
+                logger.warning((
+                    f"无法将知识库 {db['name']} 转换为 Tools, 因为向量模型不匹配，"
+                    f"当前向量模型: {self.embed_model.embed_model_fullname}，"
+                    f"知识库向量模型: {db['embed_model']}。"
+                ))
         return retrievers
 
     ################################
@@ -384,7 +391,7 @@ class KnowledgeBase:
             logger.info(f"Successfully connected to Milvus at {uri}")
             return True
         except MilvusException as e:
-            logger.error(f"Failed to connect to Milvus: {e}")
+            logger.error(f"Failed to connect to Milvus: {e}，请检查 milvus 的容器是否正常运行，如果已退出，请重新启动 `docker restart milvus-standalone-dev`")
             return False
 
     def get_collection_names(self):
@@ -475,3 +482,8 @@ class KnowledgeBase:
     def search_by_id(self, collection_name, id, output_fields=["id", "text"]):
         res = self.client.get(collection_name, id, output_fields=output_fields)
         return res
+
+    def check_embed_model(self, db_id):
+        db = self.db_manager.get_database_by_id(db_id)
+        return db["embed_model"] == self.embed_model.embed_model_fullname
+

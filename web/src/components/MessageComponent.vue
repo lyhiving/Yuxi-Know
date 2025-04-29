@@ -51,13 +51,20 @@
         :key="message.id"
         class="message-md"/>
 
+      <div v-else-if="message.reasoning_content"  class="empty-block"></div>
+
+      <!-- 工具调用 (AgentView特有) -->
+      <slot v-else-if="message.toolCalls && Object.keys(message.toolCalls).length > 0" name="tool-calls"></slot>
+
+      <div v-else class="err-msg" @click="$emit('retry')">
+        请求错误，请重试。{{ message.message }}
+      </div>
+
       <div v-if="message.isStoppedByUser" class="retry-hint">
         你停止生成了本次回答
         <span class="retry-link" @click="emit('retryStoppedMessage', message.id)">重新编辑问题</span>
       </div>
 
-      <!-- 工具调用 (AgentView特有) -->
-      <slot name="tool-calls"></slot>
 
       <div v-if="(message.role=='received' || message.role=='assistant') && message.status=='finished' && showRefs">
         <RefsComponent :message="message" :show-refs="showRefs" @retry="emit('retry')" />
@@ -124,7 +131,7 @@ const reasoningActiveKey = ref(['show']);
 // 计算属性：内容为空且正在加载
 const isEmptyAndLoading = computed(() => {
   const isEmpty = !props.message.content || props.message.content.length === 0;
-  const isLoading = props.message.status === 'init'
+  const isLoading = props.message.status === 'init' && props.isProcessing
   return isEmpty && isLoading;
 });
 </script>
@@ -183,8 +190,8 @@ const isEmptyAndLoading = computed(() => {
   }
 
   .searching-msg {
-    color: var(--gray-500);
-    animation: colorPulse 2s infinite;
+    color: var(--gray-700);
+    animation: colorPulse 1s infinite ease-in-out;
   }
 
   .reasoning-box {

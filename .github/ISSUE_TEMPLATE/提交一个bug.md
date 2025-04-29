@@ -1,23 +1,25 @@
 ---
-name: 提交一个BUG
-about: 提交一个 BUG
-title: "[BUG]"
+name: 提交一个BUG或者报错
+about: 无法启动、无法回答、后端报错等等
+title: 'Error: '
 labels: bug
 assignees: xerrors
-
+body:
+- type: textarea
+  id: repro
+  attributes:
+    label: Reproduction steps
+    description: "描述一下问题"
+    value: |
 ---
 
-### 描述这个 bug
+1️⃣ 描述一下问题
+> 简单描述一下
 
-简单描述一下这个 BUG：
 
-### 如何复现
 
-什么情况下出现：
 
-### 相关信息
-
-**1）检查 `docker logs`**
+2️⃣ 报错日志
 
 请运行以下命令，并提供部分相关日志：
 
@@ -25,11 +27,12 @@ assignees: xerrors
 docker logs --tail=100 api-dev
 ```
 
-如果问题与模型调用相关，请尝试切换到其他在线模型
-
-**2）相关截图**
+3️⃣ 相关截图
 
 
 
 
-**3）其他相关信息**
+#️⃣ 其他相关信息
+
+
+✅ 如果问题与模型调用相关，请尝试切换到其他在线模型

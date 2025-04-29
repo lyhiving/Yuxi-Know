@@ -157,7 +157,7 @@ async def index_nodes(data: dict = Body(default={})):
 @data.get("/graph/node")
 async def get_graph_node(entity_name: str):
     result = graph_base.query_node(entity_name=entity_name)
-    return {"result": retriever.format_query_results(result), "message": "success"}
+    return {"result": graph_base.format_query_result_to_graph(result), "message": "success"}
 
 @data.get("/graph/nodes")
 async def get_graph_nodes(kgdb_name: str, num: int):
@@ -166,16 +166,20 @@ async def get_graph_nodes(kgdb_name: str, num: int):
 
     logger.debug(f"Get graph nodes in {kgdb_name} with {num} nodes")
     result = graph_base.get_sample_nodes(kgdb_name, num)
-    return {"result": retriever.format_general_results(result), "message": "success"}
+    return {"result": graph_base.format_general_results(result), "message": "success"}
 
 @data.post("/graph/add-by-jsonl")
 async def add_graph_entity(file_path: str = Body(...), kgdb_name: Optional[str] = Body(None)):
     if not config.enable_knowledge_graph:
-        raise HTTPException(status_code=400, detail="Knowledge graph is not enabled")
+        return {"message": "知识图谱未启用", "status": "failed"}
 
     if not file_path.endswith('.jsonl'):
-        raise HTTPException(status_code=400, detail="file_path must be a jsonl file")
+        return {"message": "文件格式错误，请上传jsonl文件", "status": "failed"}
 
-    graph_base.jsonl_file_add_entity(file_path, kgdb_name)
-    return {"message": "Entity successfully added"}
+    try:
+        await graph_base.jsonl_file_add_entity(file_path, kgdb_name)
+        return {"message": "实体添加成功", "status": "success"}
+    except Exception as e:
+        logger.error(f"添加实体失败: {e}, {traceback.format_exc()}")
+        return {"message": f"添加实体失败: {e}", "status": "failed"}
 
